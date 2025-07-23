@@ -115,7 +115,7 @@ def process_dataframe(df):
         # Logic for mapping raw messages to categorized messages
         if "DETECTED" in msg_upper or "RESTART" in msg_upper:
             message = "Jammed"
-        elif "VOLTAGE" in msg_upper or "CURRENT" in msg_upper or "NODE" in msg_upper:
+        elif "VOLTAGE" in msg_upper or "CURRENT" in msg_upper or "NODE" in msg_upper or "MANUAL" in msg_upper:
             message = "Mechanical Error"
         elif "FAULT" in msg_upper or "ERROR" in msg_upper or "BLOCKED" in msg_upper or "WAITING" in msg_upper:
             message = "Full"
@@ -237,7 +237,7 @@ if __name__ == '__main__':
 
 
     # Schedule the task to run daily at midnight
-    schedule.every().day.at("00:00").do(fetch_store_and_process_excel)
+    schedule.every().second.do(fetch_store_and_process_excel)
 
     # Start the scheduler in a separate daemon thread
     scheduler_thread = threading.Thread(target=run_schedule)
