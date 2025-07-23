@@ -245,4 +245,5 @@ if __name__ == '__main__':
     scheduler_thread.start()
 
     # Run the Flask app
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
