@@ -72,6 +72,34 @@
         tr:hover {
             background-color: #f1f1f1; /* Hover effect */
         }
+        .info-icon {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #999;
+            color: white;
+            text-align: center;
+            font-size: 12px;
+            line-height: 16px;
+            cursor: pointer;
+            margin-left: 6px;
+            position: relative;
+            }
+            .info-icon:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            top: 20px;
+            left: 0;
+            background: #333;
+            color: white;
+            padding: 6px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            z-index: 10;
+            width: max-content;
+            max-width: 300px;
+            }
     </style>
 </head>
 
@@ -113,7 +141,7 @@
 
                 // Populate the HTML table with the received tableData
                 // Render the chart using the received chartData labels and values
-                renderChart(data.chartData.labels, data.chartData.values);
+                renderChart(data.tableData);
                 populateTable(data.tableData);
 
             } catch (error) {
@@ -128,61 +156,144 @@
          * @param {Array<string>} labels - Labels for the chart (e.g., error messages).
          * @param {Array<number>} values - Values for the chart (e.g., incident counts).
          */
-        function renderChart(labels, values) {
-            // If a chart instance already exists, destroy it before creating a new one
-            if (chart) {
-                chart.destroy();
-            }
+        function getPathColor(path) {
+            const palette = {
+                'PID 1 Man Check': '#B71C1C',
+                'PID 1 Main': '#F44336',
+                'PID 1 Sort': '#EF9A9A',
+                'PID 2 Man Check': '#6A1B9A',
+                'PID 2 Main': '#9C27B0',
+                'PID 2 Sort': '#CE93D8',
+                'PID 3 Man Check': '#4527A0',
+                'PID 3 Main': '#3F51B5',
+                'PID 3 Sort': '#9FA8DA',
+                'PID 4 Man Check': '#1976D2',
+                'PID 4 Main': '#42A5F5',
+                'PID 4 Sort': '#90CAF9',
+                'PID 5 Man Check': '#00838F',
+                'PID 5 Main': '#00BCD4',
+                'PID 5 Sort': '#80CBC4',
+                'PID 6 Man Check': '#2E7D32',
+                'PID 6 Main': '#4CAF50',
+                'PID 6 Sort': '#A5D6A7',
+                'Man Check East': '#FFEB3B',
+                'Man Check West': '#FF9800',
+                'NPC Line': '#999',
+                'NPC Station': '#999',
+                'NPC Trash': '#999'
+            };
 
+            return palette[path] || '#999';
+        }
+
+        function renderChart(data) {
+            const errorMap = {}; // { messageType: { path: count } }
+
+            data.forEach(row => {
+                const messageType = row.message || 'Other';
+                const path = row.path || 'Unknown';
+
+                if (!errorMap[messageType]) errorMap[messageType] = {};
+                errorMap[messageType][path] = (errorMap[messageType][path] || 0) + (row.incidents || 0);
+            });
+
+            // Ensure all message types have zero-filled values for all paths
+            const allPaths = Array.from(new Set(data.map(row => row.path))).sort();
+            const messageTypes = Object.keys(errorMap);
+
+            messageTypes.forEach(type => {
+                allPaths.forEach(path => {
+                    if (!errorMap[type][path]) errorMap[type][path] = 0;
+                });
+            });
+
+            const errorTypes = Object.keys(errorMap); // ['Jammed', 'Full', 'Mechanical Error']
+
+            const datasets = allPaths.map(path => {
+                return {
+                    label: path,
+                    backgroundColor: getPathColor(path),
+                    data: messageTypes.map(type => errorMap[type][path] || 0),
+                    stack: 'errorStack'
+                };
+            });
+
+            // Debug logs
+            console.log('errorMap:', errorMap);
+            console.log('errorTypes:', errorTypes);
+            console.log('datasets:', datasets);
+
+            if (chart) chart.destroy();
             const ctx = document.getElementById('errorChart').getContext('2d');
             chart = new Chart(ctx, {
-                type: 'bar', // Type of chart
+                type: 'bar',
                 data: {
-                    labels: labels, // X-axis labels
-                    datasets: [{
-                        label: 'Incidents by Error Message', // Dataset label
-                        data: values, // Y-axis values
-                        backgroundColor: 'rgba(102,126,234,0.7)', // Bar color
-                        borderColor: 'rgba(102,126,234,1)', // Border color
-                        borderWidth: 1
-                    }]
+                labels: errorTypes,
+                datasets: datasets
                 },
                 options: {
-                    responsive: true, // Chart resizes with parent container
-                    maintainAspectRatio: false, // Don't force aspect ratio
-                    scales: {
-                        y: {
-                            beginAtZero: true, // Start Y-axis from zero
-                            title: {
-                                display: true,
-                                text: 'Number of Incidents'
-                            }
-                        },
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Error Message Type'
-                            }
-                        }
+                responsive: true,
+                plugins: {
+                    title: {
+                    display: true,
+                    text: 'Incidents by Type and Area'
                     },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'top',
-                        },
-                        title: {
-                            display: true,
-                            text: 'Conveyor Incident Breakdown'
-                        }
+                    tooltip: {
+                    mode: 'index',
+                    intersect: false
+                    },
+                    legend: {
+                    position: 'bottom'
+                    }
+                },
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                scales: {
+                    x: {
+                    stacked: true
+                    },
+                    y: {
+                    stacked: true,
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Incident Count'
+                    }
                     }
                 }
+                }
             });
-        }
+            }
 
         /**
          * Populates the incident table with data.
          * @param {Array<Object>} data - An array of incident objects.
          */
+        const pathTooltips = {
+            'PID 1 Man Check': 'DD221, 222, 223, 224/225, PMT1, 2',
+            'PID 1 Main': 'DD221, 222, 223, 224/225, PMT1, 2',
+            'PID 1 Sort': 'DD221, 222, 223, 224/225, PMT1, 2',
+            'PID 2 Man Check': 'DD219, 220, 223, 225/224, PMT1, 2',
+            'PID 2 Main': 'DD219, 220, 223, 224/225, PMT1, 2',
+            'PID 2 Sort': 'DD219, 220, 223, 224/225, PMT1, 2',
+            'PID 3 Man Check': 'DD217, 218, 225/226, PMT3',
+            'PID 3 Main': 'DD217, 218, 225/226, PMT3', 
+            'PID 3 Sort': 'DD217, 218, 225/226, PMT3',
+            'PID 4 Man Check': 'DD215, 216, PMT4',
+            'PID 4 Main': 'DD215, 216, PMT4',
+            'PID 4 Sort': 'DD215, 216, PMT4',
+            'PID 5 Man Check': 'DD213, 214, PMT5, 6',
+            'PID 5 Main': 'DD213, 214, PMT5, 6',
+            'PID 5 Sort': 'DD213, 214, PMT5, 6',
+            'PID 6 Man Check': 'DD211, 212, PMT5, 6',
+            'PID 6 Main': 'DD211, 212, PMT5, 6',
+            'PID 6 Sort': 'DD211, 212, PMT5, 6',
+            'Man Check East': 'PID 4, 5, 6',
+            'Man Check West': 'PID 1, 2, 3'
+            };
+
         function populateTable(data) {
             tableBody.innerHTML = ''; // Clear existing table rows
             if (data.length === 0) {
@@ -193,8 +304,9 @@
             }
             data.forEach(row => {
                 const tr = document.createElement('tr');
+                const tooltip = pathTooltips[row.path] ? `<span class="info-icon" data-tooltip="${pathTooltips[row.path]}">i</span>` : '';
                 tr.innerHTML = `
-                    <td>${row.path || 'N/A'}</td>
+                    <td>${row.path || 'N/A'} ${tooltip}</td>
                     <td>${row.source || 'N/A'}</td>
                     <td>${row.message || 'N/A'}</td>
                     <td>${row.incidents}</td>
